@@ -7,7 +7,9 @@ let socket = null;
 
 // ================= CONNECT =================
 export const connectWithSocketIoServer = () => {
-  socket = io(SERVER);
+  socket = io(SERVER, {
+    transports: ["websocket"],
+  });
 
   socket.on("connect", () => {
     console.log("✅ connected with socket io server");
