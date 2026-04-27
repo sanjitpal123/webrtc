@@ -1,7 +1,7 @@
 import { io } from "socket.io-client";
 import { handleSignalingData, prepareNewPeerConnection } from "./webRtcHandler";
 
-const SERVER = "http://localhost:5002";
+const SERVER = "https://webrtc-1-6jo2.onrender.com";
 
 let socket = null;
 
