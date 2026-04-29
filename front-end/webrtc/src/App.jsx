@@ -4,11 +4,15 @@ import RoomPage from "./RoomPage/Room";
 import IntroductionPage from "./IntroductionPage/introductionpage";
 import JoinRoom from "./JoinPage/joinroom";
 import Context from "./store/context";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { connectWithSocketIoServer } from "./services/wss";
 
 function App() {
+  const isSocketConnected = useRef(false);
+
   useEffect(() => {
+    if (isSocketConnected.current) return;
+    isSocketConnected.current = true;
     connectWithSocketIoServer();
   }, []);
   return (

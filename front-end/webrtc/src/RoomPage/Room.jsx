@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect, useState, useRef } from "react";
 import {
   FiMic,
   FiMicOff,
@@ -43,6 +43,8 @@ function RoomPage() {
     setParticipants,
   } = useContext(GlobalStore);
 
+  const isRoomInitialized = useRef(false);
+
   const toggleChat = () => {
     setShowChat((prev) => !prev);
     setShowParticipants(false);
@@ -54,6 +56,9 @@ function RoomPage() {
   };
 
   useEffect(() => {
+    if (isRoomInitialized.current) return;
+    isRoomInitialized.current = true;
+
     const initializeRoom = () => {
       try {
         // Step 1: Ensure socket connection is initiated if not already

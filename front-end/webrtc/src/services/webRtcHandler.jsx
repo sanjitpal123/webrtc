@@ -49,7 +49,11 @@ const showLocalVideoPreview = (stream) => {
 
 // ================= CONFIG =================
 const getConfiguration = () => ({
-  iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+  iceServers: [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" },
+    { urls: "stun:stun2.l.google.com:19302" },
+  ],
 });
 
 // ================= PEER =================
@@ -135,4 +139,8 @@ const addStream = (stream, socketId) => {
   }
 
   video.srcObject = stream;
+  
+  video.onloadedmetadata = () => {
+    video.play().catch((e) => console.error("Video play error:", e));
+  };
 };
