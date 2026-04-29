@@ -25,7 +25,7 @@ export const connectWithSocketIoServer = () => {
 export const registerRoomId = (setRoomId) => {
   if (!socket) return;
 
-  socket.off("room-id"); // 🔥 prevent duplicate listeners
+  socket.off("room-id");
 
   socket.on("room-id", (data) => {
     const { roomId } = data;
@@ -37,7 +37,7 @@ export const registerRoomId = (setRoomId) => {
 export const participantsSocket = (setParticipants) => {
   if (!socket) return;
 
-  socket.off("room-update"); // 🔥 avoid multiple triggers
+  socket.off("room-update");
 
   socket.on("room-update", (data) => {
     const { connectedUser } = data;
@@ -63,7 +63,6 @@ export const joinRoom = (roomId, identity) => {
   }
 
   console.log("📤 joining room:", roomId);
-
   socket.emit("join-room", { identity, roomId });
 };
 
@@ -74,24 +73,34 @@ export const connectionForPeer = () => {
   socket.off("existing-users");
   socket.off("new-user");
   socket.off("conn-signal");
+  socket.off("conn-init");
 
-  // 🔥 NEW USER → connect to all existing users
+  // new user gets existing users
   socket.on("existing-users", ({ existingUsers }) => {
     console.log("👥 existing users:", existingUsers);
 
     existingUsers.forEach((userSocketId) => {
-      prepareNewPeerConnection(userSocketId, true); // initiator
+      prepareNewPeerConnection(userSocketId, true);
+
+      socket.emit("conn-init", {
+        connectedUserSocketId: userSocketId,
+      });
     });
   });
 
-  // 🔥 EXISTING USERS → connect to new user
+  // existing users get notified of new user
   socket.on("new-user", ({ socketId }) => {
     console.log("👤 new user:", socketId);
-
-    prepareNewPeerConnection(socketId, false); // receiver
+    prepareNewPeerConnection(socketId, false);
   });
 
-  // 🔁 signaling
+  // initiator trigger
+  socket.on("conn-init", ({ connectedUserSocketId }) => {
+    console.log("🚀 conn-init received:", connectedUserSocketId);
+    prepareNewPeerConnection(connectedUserSocketId, true);
+  });
+
+  // signaling
   socket.on("conn-signal", (data) => {
     handleSignalingData(data);
   });

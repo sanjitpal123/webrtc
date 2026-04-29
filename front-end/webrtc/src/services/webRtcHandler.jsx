@@ -1,5 +1,5 @@
 import Peer from "simple-peer";
-import { createNewRoom, joinRoom, signalPeerData } from "./wss"; // make sure this exists
+import { createNewRoom, joinRoom, signalPeerData } from "./wss";
 
 const defaultConstraints = {
   audio: true,
@@ -21,18 +21,10 @@ export const getLocalPreviewAndInitRoomConnection = async (
       await navigator.mediaDevices.getUserMedia(defaultConstraints);
 
     console.log("✅ Local stream received");
-    console.log("🎥 Tracks:", stream.getTracks());
-
     localStream = stream;
 
     showLocalVideoPreview(stream);
     setShowOverlay(false);
-
-    // ✅ ONLY continue if stream exists
-    if (!localStream) {
-      console.error("❌ localStream not set after getUserMedia");
-      return;
-    }
 
     if (isRoomHost) {
       createNewRoom(identity);
@@ -41,63 +33,70 @@ export const getLocalPreviewAndInitRoomConnection = async (
     }
   } catch (err) {
     console.error("❌ Error accessing media devices:", err);
-
-    alert("Camera/Mic not available. Close other tabs or use another browser.");
-
-    // ❗ VERY IMPORTANT: STOP FLOW
+    alert("Camera/Mic not available.");
     return;
   }
 };
 
 const showLocalVideoPreview = (stream) => {
   const video = document.getElementById("local_video");
+
   if (video) {
     video.srcObject = stream;
-    video.muted = true; // ✅ autoplay fix
+    video.muted = true;
   }
 };
 
-// ================= PEER CONNECTION =================
+// ================= CONFIG =================
 const getConfiguration = () => ({
   iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
 });
 
+// ================= PEER =================
 export const prepareNewPeerConnection = (
   connectedUserSocketId,
   isInitiator,
 ) => {
-  console.log("🧩 Creating peer:", connectedUserSocketId, isInitiator);
-
-  // ❗ HARD BLOCK (MAIN FIX)
-  if (!localStream) {
-    console.error("❌ BLOCKED: localStream not ready");
+  if (peers[connectedUserSocketId]) {
     return;
   }
 
+  if (!localStream) {
+    console.error("❌ local stream missing");
+    return;
+  }
+
+  console.log("🧩 creating peer:", connectedUserSocketId, isInitiator);
+
   const peer = new Peer({
     initiator: isInitiator,
+    trickle: true,
     config: getConfiguration(),
     stream: localStream,
   });
 
   peers[connectedUserSocketId] = peer;
 
-  // 🔁 Send signaling data
   peer.on("signal", (data) => {
+    console.log("📡 sending signal");
     signalPeerData({
       signal: data,
       connectedUserSocketId,
     });
   });
 
-  // 🎥 Receive remote stream
   peer.on("stream", (stream) => {
-    console.log("🎥 Remote stream received");
+    console.log("🎥 remote stream received");
     addStream(stream, connectedUserSocketId);
   });
 
   peer.on("error", (err) => {
-    console.error("❌ Peer error:", err);
+    console.error("❌ peer error:", err);
+  });
+
+  peer.on("close", () => {
+    console.log("peer closed");
+    delete peers[connectedUserSocketId];
   });
 };
 
@@ -105,17 +104,10 @@ export const prepareNewPeerConnection = (
 export const handleSignalingData = (data) => {
   const { connectedUserSocketId, signal } = data;
 
-  console.log("📡 Signal received from:", connectedUserSocketId);
+  console.log("📥 signal received from:", connectedUserSocketId);
 
-  // 🔥 create peer if not exists
   if (!peers[connectedUserSocketId]) {
     prepareNewPeerConnection(connectedUserSocketId, false);
-  }
-
-  // ❗ EXTRA SAFETY
-  if (!peers[connectedUserSocketId]) {
-    console.error("❌ Peer not available, skipping signal");
-    return;
   }
 
   peers[connectedUserSocketId].signal(signal);
@@ -134,7 +126,6 @@ const addStream = (stream, socketId) => {
 
   if (!video) {
     video = document.createElement("video");
-
     video.id = socketId;
     video.autoplay = true;
     video.playsInline = true;

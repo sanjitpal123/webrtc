@@ -14,9 +14,6 @@ app.use(cors());
 let connectedUser = [];
 let rooms = [];
 
-/**
- * ✅ CHECK IF ROOM EXISTS (same as yours, fixed)
- */
 app.get("/api/room-exists/:roomId", (req, res) => {
     const { roomId } = req.params;
 
@@ -25,17 +22,13 @@ app.get("/api/room-exists/:roomId", (req, res) => {
     if (room) {
         if (room.connectedUser.length >= 4) {
             return res.send({ roomExists: true, full: true });
-        } else {
-            return res.send({ roomExists: true, full: false });
         }
-    } else {
-        return res.send({ roomExists: false });
+        return res.send({ roomExists: true, full: false });
     }
+
+    return res.send({ roomExists: false });
 });
 
-/**
- * ✅ SOCKET SETUP
- */
 const io = new Server(server, {
     cors: {
         origin: "*",
@@ -44,95 +37,102 @@ const io = new Server(server, {
 });
 
 io.on("connection", (socket) => {
-    console.log(`user connected successfully ${socket.id}`);
+    console.log(`user connected ${socket.id}`);
 
     socket.on("create-new-room", (data) => {
-        createNewRoomHandler(socket, data); // ✅ pass socket
+        createNewRoomHandler(socket, data);
     });
-    socket.on('join-room', (data) => {
-        console.log('join room socket')
-        Joinroomhandler(data, socket)
+
+    socket.on("join-room", (data) => {
+        Joinroomhandler(data, socket);
     });
-    socket.on('disconnect', () => {
-        disconnectHandler(socket)
+
+    socket.on("disconnect", () => {
+        disconnectHandler(socket);
     });
-    socket.on('conn-signal', data => {
+
+    socket.on("conn-signal", (data) => {
         signalingHandler(data, socket);
     });
-    socket.on('conn-init', data => {
-        initializingConnectionhandler(data, socket)
-    })
+
+    socket.on("conn-init", (data) => {
+        initializingConnectionhandler(data, socket);
+    });
 });
-function functioninitializingConnectionhandler(data, socket) {
+
+function initializingConnectionhandler(data, socket) {
     const { connectedUserSocketId } = data;
-    const initData = { connectedUserSocketId: socket.id };
-    io.to(connectedUserSocketId).emit('conn-init', initData)
+
+    io.to(connectedUserSocketId).emit("conn-init", {
+        connectedUserSocketId: socket.id,
+    });
 }
 
 function signalingHandler(data, socket) {
     const { connectedUserSocketId, signal } = data;
-    const signalingData = { signal, connectedUserSocketId: socket.id };
-    io.to(connectedUserSocketId).emit('conn-signal', signalingData)
 
+    io.to(connectedUserSocketId).emit("conn-signal", {
+        signal,
+        connectedUserSocketId: socket.id,
+    });
 }
-// dis connect handler
+
 function disconnectHandler(socket) {
-    // find if user has been register , if yes remove him from 
-    const user = connectedUser.find(user => user.socketId === socket.id);
-    if (user) {
-        const room = rooms.find(room => room.id === user.roomId);
-        room.connectedUser = room.connectedUser.filter(user => user.socketId !== socket.id);
-        // leave the socket io room 
-        socket.leave(user.roomId);
-        io.to(room.id).emit('room-update', {
-            connectedUser: room.connectedUser
-        })
-        /// close the room if amount the user which will stay in room wil be o 
-    }
+    const user = connectedUser.find((user) => user.socketId === socket.id);
 
+    if (!user) return;
+
+    const room = rooms.find((room) => room.id === user.roomId);
+
+    if (!room) return;
+
+    room.connectedUser = room.connectedUser.filter(
+        (user) => user.socketId !== socket.id
+    );
+
+    connectedUser = connectedUser.filter(
+        (user) => user.socketId !== socket.id
+    );
+
+    socket.leave(user.roomId);
+
+    io.to(room.id).emit("room-update", {
+        connectedUser: room.connectedUser,
+    });
 }
-/**
- * ✅ CREATE ROOM HANDLER (fixed only)
- */
-const createNewRoomHandler = (socket, data) => {
-    console.log("host is creating new room");
-    console.log(data);
 
+const createNewRoomHandler = (socket, data) => {
     const { identity } = data;
     const roomId = randomUUID();
 
     const newUser = {
         identity,
         id: randomUUID(),
-        socketId: socket.id, // ✅ now works
+        socketId: socket.id,
         roomId,
     };
 
-    // add user
-    connectedUser = [...connectedUser, newUser];
+    connectedUser.push(newUser);
 
     const newRoom = {
         id: roomId,
         connectedUser: [newUser],
     };
 
-    // ✅ correct way to join room
+    rooms.push(newRoom);
+
     socket.join(roomId);
 
-    // add room
-    rooms = [...rooms, newRoom];
-
-    // ✅ send only to creator (not everyone)
     socket.emit("room-id", { roomId });
-    console.log('connected user', newRoom.connectedUser)
-    socket.emit('room-update', { connectedUser: newRoom.connectedUser });
-
+    socket.emit("room-update", {
+        connectedUser: newRoom.connectedUser,
+    });
 };
+
 function Joinroomhandler(data, socket) {
     const { identity, roomId } = data;
 
     const room = rooms.find((room) => room.id === roomId);
-
     if (!room) return;
 
     const newUser = {
@@ -142,19 +142,16 @@ function Joinroomhandler(data, socket) {
         roomId,
     };
 
-    // 🔥 1. Send existing users to NEW user
     socket.emit("existing-users", {
         existingUsers: room.connectedUser.map((u) => u.socketId),
     });
 
-    // 🔥 2. Notify existing users about NEW user
     room.connectedUser.forEach((user) => {
         io.to(user.socketId).emit("new-user", {
             socketId: socket.id,
         });
     });
 
-    // 🔥 3. Add user
     room.connectedUser.push(newUser);
     connectedUser.push(newUser);
 
@@ -164,6 +161,7 @@ function Joinroomhandler(data, socket) {
         connectedUser: room.connectedUser,
     });
 }
+
 server.listen(PORT, () => {
-    console.log(`server is listening at ${PORT}`);
+    console.log(`server running on ${PORT}`);
 });
