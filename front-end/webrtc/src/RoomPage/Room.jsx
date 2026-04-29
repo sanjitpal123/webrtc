@@ -28,6 +28,11 @@ import {
 
 function RoomPage() {
   const [micOn, setMicOn] = useState(true);
+  const [videoOn, setVideoOn] = useState(true);
+
+  const [showChat, setShowChat] = useState(false);
+  const [showParticipants, setShowParticipants] = useState(false);
+
   const {
     roomId,
     HostUser,
@@ -36,38 +41,55 @@ function RoomPage() {
     showOverLay,
     setShowOverlay,
     setParticipants,
-    participants,
   } = useContext(GlobalStore);
-  const [videoOn, setVideoOn] = useState(true);
-
-  // Sidebar states
-  const [showChat, setShowChat] = useState(false);
-  const [showParticipants, setShowParticipants] = useState(false);
 
   const toggleChat = () => {
-    setShowChat(!showChat);
-    if (!showChat) setShowParticipants(false);
+    setShowChat((prev) => !prev);
+    setShowParticipants(false);
   };
 
   const toggleParticipants = () => {
-    setShowParticipants(!showParticipants);
-    if (!showParticipants) setShowChat(false);
+    setShowParticipants((prev) => !prev);
+    setShowChat(false);
   };
 
   useEffect(() => {
-    getLocalPreviewAndInitRoomConnection(
-      HostUser,
-      Identity,
-      roomId,
-      setShowOverlay,
-    );
-    connectWithSocketIoServer();
-    connectionForPeer();
+    const initializeRoom = async () => {
+      try {
+        // Step 1: get local media first
+        await getLocalPreviewAndInitRoomConnection(
+          HostUser,
+          Identity,
+          roomId,
+          setShowOverlay,
+        );
+
+        // Step 2: connect socket
+        connectWithSocketIoServer();
+
+        // Step 3: wait until socket connected
+        const interval = setInterval(() => {
+          if (socket && socket.connected) {
+            clearInterval(interval);
+
+            console.log("✅ socket connected");
+
+            // Step 4: register listeners
+            registerRoomId(setRoomId);
+            participantsSocket(setParticipants);
+
+            // Step 5: initialize peer
+            connectionForPeer();
+          }
+        }, 500);
+      } catch (error) {
+        console.error("❌ room initialization error:", error);
+      }
+    };
+
+    initializeRoom();
   }, []);
-  useEffect(() => {
-    registerRoomId(setRoomId);
-    participantsSocket(setParticipants);
-  }, [socket]);
+
   return (
     <div className="room_container">
       <div className="animated-bg"></div>
@@ -88,6 +110,7 @@ function RoomPage() {
           >
             V
           </div>
+
           <h2 className="logo_text" style={{ fontSize: "24px" }}>
             V-Call
           </h2>
@@ -126,13 +149,16 @@ function RoomPage() {
         {(showChat || showParticipants) && (
           <aside className="room_sidebar glass-heavy">
             {showChat && <ChatSection close={() => setShowChat(false)} />}
+
             {showParticipants && (
               <ParticipatnsPage close={() => setShowParticipants(false)} />
             )}
           </aside>
         )}
       </main>
+
       {showOverLay && <Overlay />}
+
       <footer className="room_toolbar">
         <button
           className={`toolbar_button ${!micOn ? "active" : ""}`}
