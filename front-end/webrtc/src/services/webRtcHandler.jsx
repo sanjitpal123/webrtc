@@ -144,3 +144,21 @@ const addStream = (stream, socketId) => {
     video.play().catch((e) => console.error("Video play error:", e));
   };
 };
+
+// ================= CLEANUP =================
+export const closeAllConnections = () => {
+  Object.entries(peers).forEach(([socketId, peer]) => {
+    if (peer) peer.destroy();
+    delete peers[socketId];
+  });
+
+  if (localStream) {
+    localStream.getTracks().forEach((track) => track.stop());
+    localStream = null;
+  }
+  
+  const container = document.getElementById("remote_video");
+  if (container) {
+    container.innerHTML = "";
+  }
+};

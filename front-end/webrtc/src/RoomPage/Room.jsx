@@ -16,7 +16,10 @@ import { GlobalStore } from "../store/context";
 
 import ChatSection from "../chatsection/chatsecion";
 import ParticipatnsPage from "../participatns/participants";
-import { getLocalPreviewAndInitRoomConnection } from "../services/webRtcHandler";
+import { 
+  getLocalPreviewAndInitRoomConnection,
+  closeAllConnections
+} from "../services/webRtcHandler";
 import Overlay from "./Overlay";
 import {
   connectionForPeer,
@@ -93,6 +96,20 @@ function RoomPage() {
     };
 
     initializeRoom();
+
+    return () => {
+      // Cleanup WebRTC connections and stop media tracks when leaving the room
+      closeAllConnections();
+      
+      // Cleanup socket listeners
+      if (socket) {
+        socket.off("room-id");
+        socket.off("room-update");
+        socket.off("existing-users");
+        socket.off("new-user");
+        socket.off("conn-signal");
+      }
+    };
   }, []);
 
   return (
