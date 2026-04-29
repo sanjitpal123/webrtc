@@ -73,7 +73,6 @@ export const connectionForPeer = () => {
   socket.off("existing-users");
   socket.off("new-user");
   socket.off("conn-signal");
-  socket.off("conn-init");
 
   // new user gets existing users
   socket.on("existing-users", ({ existingUsers }) => {
@@ -81,10 +80,6 @@ export const connectionForPeer = () => {
 
     existingUsers.forEach((userSocketId) => {
       prepareNewPeerConnection(userSocketId, true);
-
-      socket.emit("conn-init", {
-        connectedUserSocketId: userSocketId,
-      });
     });
   });
 
@@ -94,11 +89,6 @@ export const connectionForPeer = () => {
     prepareNewPeerConnection(socketId, false);
   });
 
-  // initiator trigger
-  socket.on("conn-init", ({ connectedUserSocketId }) => {
-    console.log("🚀 conn-init received:", connectedUserSocketId);
-    prepareNewPeerConnection(connectedUserSocketId, true);
-  });
 
   // signaling
   socket.on("conn-signal", (data) => {

@@ -54,34 +54,34 @@ function RoomPage() {
   };
 
   useEffect(() => {
-    const initializeRoom = async () => {
+    const initializeRoom = () => {
       try {
-        // Step 1: get local media first
-        await getLocalPreviewAndInitRoomConnection(
-          HostUser,
-          Identity,
-          roomId,
-          setShowOverlay,
-        );
+        // Step 1: Ensure socket connection is initiated if not already
+        if (!socket || !socket.connected) {
+          connectWithSocketIoServer();
+        }
 
-        // Step 2: connect socket
-        connectWithSocketIoServer();
-
-        // Step 3: wait until socket connected
-        const interval = setInterval(() => {
+        // Step 2: Wait until socket is connected before doing anything else
+        const interval = setInterval(async () => {
           if (socket && socket.connected) {
             clearInterval(interval);
-
             console.log("✅ socket connected");
 
-            // Step 4: register listeners
+            // Step 3: Register all listeners BEFORE joining the room
+            // This prevents race conditions where 'existing-users' or 'room-id' is missed
             registerRoomId(setRoomId);
             participantsSocket(setParticipants);
-
-            // Step 5: initialize peer
             connectionForPeer();
+
+            // Step 4: Get local media and then emit create-new-room/join-room
+            await getLocalPreviewAndInitRoomConnection(
+              HostUser,
+              Identity,
+              roomId,
+              setShowOverlay,
+            );
           }
-        }, 500);
+        }, 100); // Check frequently (every 100ms)
       } catch (error) {
         console.error("❌ room initialization error:", error);
       }
